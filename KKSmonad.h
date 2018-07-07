@@ -33,7 +33,7 @@ namespace kks
     //-----------------------------------------------------
     // オブジェクトが入ってあるなら真となるオブジェクト管理テンプレートクラス
     // Ft: 偽クラス（Nothing を標準として提供してある）
-    // T: オブジェクトクラス
+    // T: オブジェクトクラス（代入に対応していないオブジェクトは、ポインタで管理する）
     class Nothing {};
     template<class Ft, class T>
     class Just
@@ -104,24 +104,40 @@ public:                                          \
             ~Maybe() {}
     };
 
+    template<class T>
+    kks::Maybe<T> MaybeOrNothing(bool th, T a) {
+        return th ? kks::Maybe<T>(a) : kks::Nothing();
+    }
+
     //-----------------------------------------------------
     // Maybe 用バインド関数
     template<class T, class F>
     const Maybe<T>& Bind(Maybe<T>& m, F f) {
-        m = m ? f(m.Get()) : Nothing();
+        m = m ? f(*m) : Nothing();
         return m;
     }
 
+#define MAYBE_FUNC(x,a)   [](x a) -> kks::Maybe<x>
 
-//-----------------------------------------------------
-// class Functor<T> を継承するためのコンストラクタ宣言
-// ※最低限必要なものをマクロでまとめて提供する
-#define        maybeMonadFUNCTOR(x)          \
-private:                                     \
-    using SUPER = kks::Functor<x>;           \
-public:                                      \
-    SUPER* Functor(void) {                   \
-        return static_cast<SUPER*>(this);    \
+
+    //-----------------------------------------------------
+    // class Functor<T> を継承するためのコンストラクタ宣言
+    // ※最低限必要なものをマクロでまとめて提供する
+#define        maybeMonadFUNCTOR(x)             \
+    kksCLASS                                    \
+    kksCLASS_defaultImplement                   \
+private:                                        \
+    using SUPER = kks::Functor<x>;              \
+    using Return = kks::Maybe<x>;               \
+    Return maybe(x a) {                         \
+        return Return(a);                       \
+    }                                           \
+    Return MaybeOrNothing(bool th, x a) {       \
+        return th ? maybe(a) : kks::Nothing();  \
+    }                                           \
+public:                                         \
+    SUPER* Functor(void) {                      \
+        return static_cast<SUPER*>(this);       \
     }
 
     //-----------------------------------------------------
