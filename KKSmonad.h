@@ -151,9 +151,9 @@ public:                                         \
 
     public:
         ~Functor() {}
-        virtual Maybe<T> Proc(T a) = 0;
+        virtual Maybe<T> Process(T a) = 0;
         Maybe<T> operator()(T& a) {
-            return Proc(a);
+            return Process(a);
         }
     };
 
