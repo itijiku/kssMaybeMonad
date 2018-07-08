@@ -105,7 +105,7 @@ public:                                          \
     };
 
     template<class T>
-    kks::Maybe<T> MaybeOrNothing(bool th, T a) {
+    kks::Maybe<T> OrNothing(bool th, T a) {
         return th ? kks::Maybe<T>(a) : kks::Nothing();
     }
 
@@ -132,7 +132,7 @@ private:                                        \
     Return maybe(x a) {                         \
         return Return(a);                       \
     }                                           \
-    Return MaybeOrNothing(bool th, x a) {       \
+    Return OrNothing(bool th, x a) {            \
         return th ? maybe(a) : kks::Nothing();  \
     }                                           \
 public:                                         \
