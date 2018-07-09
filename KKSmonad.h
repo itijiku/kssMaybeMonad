@@ -105,7 +105,7 @@ public:                                          \
     };
 
     template<class T>
-    kks::Maybe<T> OrNothing(bool th, T a) {
+    kks::Maybe<T> MaybeOrNothing(bool th, T a) {
         return th ? kks::Maybe<T>(a) : kks::Nothing();
     }
 
@@ -132,7 +132,7 @@ private:                                        \
     Return maybe(x a) {                         \
         return Return(a);                       \
     }                                           \
-    Return OrNothing(bool th, x a) {            \
+    Return MaybeOrNothing(bool th, x a) {       \
         return th ? maybe(a) : kks::Nothing();  \
     }                                           \
 public:                                         \
@@ -150,6 +150,7 @@ public:                                         \
             kksCLASS_defaultImplement
 
     public:
+        Functor() {}
         ~Functor() {}
         virtual Maybe<T> Process(T a) = 0;
         Maybe<T> operator()(T& a) {
@@ -176,15 +177,19 @@ public:                                         \
 private:                                      \
     using SUPER = kks::Maybe<t>;              \
 public:                                       \
-    x()                                       \
-        : SUPER() {}                          \
+    x(MonadFunctor* fn = nullptr)             \
+        : SUPER()                             \
+        , mpOnFailedFunctor() {}              \
     x(const T& a)                             \
-        : SUPER(a) {}                         \
+        : SUPER(a)                            \
+        , mpOnFailedFunctor() {}              \
     x(const Nothing& a)                       \
-        : SUPER(a) {}
+        : SUPER(a)                            \
+        , mpOnFailedFunctor() {}
 
 #define    maybeMonadCONSTRUCTOR(x)     maybeMonadCONSTRUCTOR_BASE(x,T)
 
+    // meybeモナドクラス
     template<class T>
     class maybeMonad
         : public Maybe<T>
@@ -193,22 +198,52 @@ public:                                       \
             kksCLASS_defaultImplement
 
     public:
-        using MonadFunctor = Functor<T>;
+        using MonadFunctor = kks::Functor<T>;
+
+        //-----------------------------------------------------
+        // バインドストリーム（>>）偽評価時用標準ファンクタ
+        // ※偽であれば、処理結果を取り下げる
+        template<class T>
+        class MF_Reset
+            : public MonadFunctor
+        {
+            maybeMonadFUNCTOR(T)
+
+        public:
+            Return Process(T a) override {
+                return a;
+            }
+        };
+        static MF_Reset<T> mMFOnFailed;
+
+    private:
+        MonadFunctor* mpOnFailedFunctor; // バインドストリーム（>>）偽評価時処理用ファンクタ
 
     public:
         maybeMonadCONSTRUCTOR(maybeMonad)
             ~maybeMonad() {}
 
+        // バインドストリーム（>>）偽評価時処理用ファンクタを登録する
+        maybeMonad<T>& BindOnFailedFunctor(MonadFunctor* f = mMFOnFailed.Functor()) {
+            mpOnFailedFunctor = f;
+            return *this;
+        }
+
         const Maybe<T>& Bind(Functor<T>* f = nullptr) { return kks::Bind(*this, f); }
         maybeMonad<T>& operator>>=(MonadFunctor* f) { kks::Bind(*this, f); return *this; }
         maybeMonad<T>& operator>>(MonadFunctor* f) { return operator>><MonadFunctor*>(f); }
-        template<class F> const Maybe<T>& Bind(F f) { return kks::Bind(*this, f); }
+        template<class F> const Maybe<T>& Bind(F f)& { return kks::Bind(*this, f); }
         template<class F> maybeMonad<T>& operator>>=(F f) { kks::Bind(*this, f); return *this; }
         template<class F> maybeMonad<T>& operator>>(F f) {
-            Maybe<T> bk = *this;
-            if (!Bind(f)) Maybe<T>::operator=(bk);
+            ASSERT(mpOnFailedFunctor);
+            Maybe<T> bk(*this);
+            if (!Bind(f))
+                Maybe<T>::operator=((*mpOnFailedFunctor)(*bk));
             return *this;
         }
     };
+
+    template<class T>
+    maybeMonad<T>::MF_Reset<T> maybeMonad<T>::mMFOnFailed;
 
 }
